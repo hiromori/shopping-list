@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="買い物メモ">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="家族で共有できる買い物リストアプリ">
+    
+    <title>家族の買い物メモ</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23667eea;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23764ba2;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='200' height='200' rx='40' fill='url(%23grad)'/%3E%3Ctext x='100' y='130' font-size='100' text-anchor='middle' fill='white'%3E🛒%3C/text%3E%3C/svg%3E">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* 安全領域対応 */
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 60px rgba(0,0,0,0.3);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: max(30px, env(safe-area-inset-top)) 20px 30px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .family-name {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+        }
+
+        .status-indicator.offline {
+            background: #f87171;
+        }
+
+        .share-section {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .share-button {
+            width: 100%;
+            padding: 12px;
+            background: #06c755;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .share-button:active {
+            background: #05b04d;
+            transform: scale(0.98);
+        }
+
+        .input-section {
+            padding: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            background: white;
+            position: sticky;
+            top: 140px;
+            z-index: 99;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        #itemInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        #itemInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #addButton {
+            padding: 15px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #addButton:active {
+            background: #5568d3;
+            transform: scale(0.98);
+        }
+
+        .list-section {
+            padding: 20px;
+            min-height: 300px;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .list-item.checked {
+            opacity: 0.5;
+            background: #e9ecef;
+        }
+
+        .list-item.checked .item-text {
+            text-decoration: line-through;
+            color: #6c757d;
+        }
+
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            cursor: pointer;
+        }
+
+        .item-text {
+            flex: 1;
+            font-size: 16px;
+            color: #333;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .delete-button {
+            padding: 8px 15px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .delete-button:active {
+            background: #c82333;
+            transform: scale(0.98);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .modal-button.primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-button.primary:active {
+            background: #5568d3;
+        }
+
+        .modal-button.secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .modal-button.secondary:active {
+            background: #dee2e6;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: calc(80px + env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 2000;
+            max-width: 90%;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .install-prompt {
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .install-prompt.show {
+            display: flex;
+        }
+
+        .install-prompt button {
+            padding: 8px 16px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .install-prompt button:active {
+            background: #f0f0f0;
+        }
+
+        .close-install {
+            background: transparent !important;
+            color: white !important;
+            font-size: 20px;
+            padding: 4px 8px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="install-prompt" id="installPrompt">
+            <span>📱 アプリとしてインストールできます</span>
+            <div style="display: flex; gap: 8px;">
+                <button id="installButton">インストール</button>
+                <button class="close-install" id="closeInstall">×</button>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1>🛒 買い物メモ</h1>
+            <div class="family-name" id="familyName">家族の買い物リスト</div>
+            <div class="status-bar">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">オンライン</span>
+            </div>
+        </div>
+
+        <div class="share-section">
+            <button class="share-button" id="shareButton">
+                <span>📱</span>
+                <span>招待リンクをコピー（LINEで共有）</span>
+            </button>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input type="text" id="itemInput" placeholder="買うものを入力..." />
+                <button id="addButton">追加</button>
+            </div>
+        </div>
+
+        <div class="list-section" id="listSection">
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                </svg>
+                <p>買い物リストが空です</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="nameModal">
+        <div class="modal-content">
+            <h2>ようこそ！</h2>
+            <input type="text" id="familyNameInput" placeholder="家族の名前（例：田中家）" />
+            <div class="modal-buttons">
+                <button class="modal-button primary" id="saveNameButton">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then((registration) => {
+                    console.log('Service Worker registered:', registration);
+                })
+                .catch((error) => {
+                    console.log('Service Worker registration failed:', error);
+                });
+        }
+
+        // PWAインストールプロンプト
+        let deferredPrompt;
+        const installPrompt = document.getElementById('installPrompt');
+        const installButton = document.getElementById('installButton');
+        const closeInstall = document.getElementById('closeInstall');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installPrompt.classList.add('show');
+        });
+
+        installButton.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response: ${outcome}`);
+                deferredPrompt = null;
+                installPrompt.classList.remove('show');
+            }
+        });
+
+        closeInstall.addEventListener('click', () => {
+            installPrompt.classList.remove('show');
+        });
+
+        // オンライン/オフライン状態の監視
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
+        function updateOnlineStatus() {
+            if (navigator.onLine) {
+                statusIndicator.classList.remove('offline');
+                statusText.textContent = 'オンライン';
+            } else {
+                statusIndicator.classList.add('offline');
+                statusText.textContent = 'オフライン';
+            }
+        }
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+
+        // ストレージキーの生成
+        function getStorageKey() {
+            const params = new URLSearchParams(window.location.search);
+            const listId = params.get('list') || 'default';
+            return `shopping_list_${listId}`;
+        }
+
+        function getFamilyNameKey() {
+            const params = new URLSearchParams(window.location.search);
+            const listId = params.get('list') || 'default';
+            return `family_name_${listId}`;
+        }
+
+        // ストレージ操作
+        async function loadData() {
+            try {
+                const key = getStorageKey();
+                const result = await window.storage.get(key, true);
+                return result ? JSON.parse(result.value) : [];
+            } catch (error) {
+                console.log('Loading from memory');
+                return [];
+            }
+        }
+
+        async function saveData(items) {
+            try {
+                const key = getStorageKey();
+                await window.storage.set(key, JSON.stringify(items), true);
+            } catch (error) {
+                console.log('Saved to memory only');
+            }
+        }
+
+        async function loadFamilyName() {
+            try {
+                const key = getFamilyNameKey();
+                const result = await window.storage.get(key, true);
+                return result ? result.value : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        async function saveFamilyName(name) {
+            try {
+                const key = getFamilyNameKey();
+                await window.storage.set(key, name, true);
+            } catch (error) {
+                console.log('Could not save family name');
+            }
+        }
+
+        let items = [];
+
+        // UI要素
+        const itemInput = document.getElementById('itemInput');
+        const addButton = document.getElementById('addButton');
+        const listSection = document.getElementById('listSection');
+        const shareButton = document.getElementById('shareButton');
+        const nameModal = document.getElementById('nameModal');
+        const familyNameInput = document.getElementById('familyNameInput');
+        const saveNameButton = document.getElementById('saveNameButton');
+        const familyNameDisplay = document.getElementById('familyName');
+        const toast = document.getElementById('toast');
+
+        // トースト表示
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // リスト描画
+        function renderList() {
+            if (items.length === 0) {
+                listSection.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                        </svg>
+                        <p>買い物リストが空です</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listSection.innerHTML = items.map((item, index) => `
+                <div class="list-item ${item.checked ? 'checked' : ''}">
+                    <input type="checkbox" class="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleItem(${index})">
+                    <span class="item-text">${escapeHtml(item.text)}</span>
+                    <button class="delete-button" onclick="deleteItem(${index})">削除</button>
+                </div>
+            `).join('');
+        }
+
+        // HTML エスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // アイテム追加
+        async function addItem() {
+            const text = itemInput.value.trim();
+            if (!text) return;
+
+            items.push({ text, checked: false, timestamp: Date.now() });
+            itemInput.value = '';
+            await saveData(items);
+            renderList();
+        }
+
+        // アイテムのチェック切り替え
+        async function toggleItem(index) {
+            items[index].checked = !items[index].checked;
+            await saveData(items);
+            renderList();
+        }
+
+        // アイテム削除
+        async function deleteItem(index) {
+            items.splice(index, 1);
+            await saveData(items);
+            renderList();
+        }
+
+        // 招待リンク生成
+        function generateInviteLink() {
+            const params = new URLSearchParams(window.location.search);
+            let listId = params.get('list');
+            
+            if (!listId) {
+                listId = Math.random().toString(36).substring(2, 15);
+                const newUrl = `${window.location.pathname}?list=${listId}`;
+                window.history.replaceState({}, '', newUrl);
+            }
+
+            return `${window.location.origin}${window.location.pathname}?list=${listId}`;
+        }
+
+        // 共有機能
+        shareButton.addEventListener('click', async () => {
+            const inviteLink = generateInviteLink();
+            
+            // Web Share API対応
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: '家族の買い物メモ',
+                        text: '買い物リストを共有します',
+                        url: inviteLink
+                    });
+                    return;
+                } catch (error) {
+                    // キャンセルされた場合は何もしない
+                    if (error.name === 'AbortError') return;
+                }
+            }
+            
+            // フォールバック：クリップボードにコピー
+            try {
+                await navigator.clipboard.writeText(inviteLink);
+                showToast('リンクをコピーしました！LINEで共有してください');
+            } catch (error) {
+                // さらにフォールバック
+                const textarea = document.createElement('textarea');
+                textarea.value = inviteLink;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('リンクをコピーしました！LINEで共有してください');
+            }
+        });
+
+        // 家族名保存
+        saveNameButton.addEventListener('click', async () => {
+            const name = familyNameInput.value.trim();
+            if (name) {
+                await saveFamilyName(name);
+                familyNameDisplay.textContent = `${name}の買い物リスト`;
+                nameModal.classList.remove('active');
+            }
+        });
+
+        // イベントリスナー
+        addButton.addEventListener('click', addItem);
+        itemInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addItem();
+            }
+        });
+
+        // グローバル関数として定義
+        window.toggleItem = toggleItem;
+        window.deleteItem = deleteItem;
+
+        // 初期化
+        async function init() {
+            items = await loadData();
+            renderList();
+
+            const familyName = await loadFamilyName();
+            if (familyName) {
+                familyNameDisplay.textContent = `${familyName}の買い物リスト`;
+            } else {
+                const params = new URLSearchParams(window.location.search);
+                if (!params.get('list')) {
+                    nameModal.classList.add('active');
+                }
+            }
+
+            // 定期的に他の人の更新をチェック
+            setInterval(async () => {
+                const latestItems = await loadData();
+                if (JSON.stringify(latestItems) !== JSON.stringify(items)) {
+                    items = latestItems;
+                    renderList();
+                }
+            }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

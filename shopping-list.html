@@ -282,18 +282,6 @@
             user-select: text;
         }
 
-        .modal-content textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: monospace;
-            margin-bottom: 20px;
-            resize: vertical;
-            min-height: 150px;
-        }
-
         .modal-buttons {
             display: flex;
             gap: 10px;
@@ -317,15 +305,6 @@
 
         .modal-button.primary:active {
             background: #5568d3;
-        }
-
-        .modal-button.secondary {
-            background: #e9ecef;
-            color: #333;
-        }
-
-        .modal-button.secondary:active {
-            background: #dee2e6;
         }
 
         .toast {
@@ -382,37 +361,6 @@
             font-size: 20px;
             padding: 4px 8px !important;
         }
-
-        .firebase-setup {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            padding: 15px;
-            margin: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .firebase-setup h3 {
-            color: #856404;
-            margin-bottom: 10px;
-        }
-
-        .firebase-setup button {
-            margin-top: 10px;
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .config-note {
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
@@ -434,12 +382,6 @@
             </div>
         </div>
 
-        <div class="firebase-setup" id="firebaseSetup" style="display: none;">
-            <h3>⚙️ Firebase設定が必要です</h3>
-            <p>初回のみ、Firebase設定情報を入力してください</p>
-            <button id="openConfigButton">設定を入力</button>
-        </div>
-
         <div class="share-section">
             <button class="share-button" id="shareButton">
                 <span>📱</span>
@@ -450,7 +392,7 @@
         <div class="input-section">
             <div class="input-group">
                 <input type="text" id="itemInput" placeholder="買うものを入力..." />
-                <button id="addButton" disabled>追加</button>
+                <button id="addButton">追加</button>
             </div>
         </div>
 
@@ -475,39 +417,28 @@
         </div>
     </div>
 
-    <div class="modal" id="configModal">
-        <div class="modal-content">
-            <h2>Firebase設定</h2>
-            <p style="font-size: 14px; color: #666; margin-bottom: 15px;">
-                Firebaseコンソールで取得した設定情報を貼り付けてください
-            </p>
-            <textarea id="configInput" placeholder='
-                const firebaseConfig = {
-                apiKey: "AIzaSyAe1O5irhlh_AdsTXbio-PfGXffz7N6aow",
-                authDomain: "shopping-list-54e1c.firebaseapp.com",
-                projectId: "shopping-list-54e1c",
-                storageBucket: "shopping-list-54e1c.firebasestorage.app",
-                messagingSenderId: "613415694699",
-                appId: "1:613415694699:web:ca7bf0296f0487894adc2e"
-                };'
-                ></textarea>
-            <div class="modal-buttons">
-                <button class="modal-button primary" id="saveConfigButton">保存</button>
-                <button class="modal-button secondary" id="cancelConfigButton">キャンセル</button>
-            </div>
-            <p class="config-note">※この設定は一度だけ必要です</p>
-        </div>
-    </div>
-
     <div class="toast" id="toast"></div>
 
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyAe1O5irhlh_AdsTXbio-PfGXffz7N6aow",
+            authDomain: "shopping-list-54e1c.firebaseapp.com",
+            projectId: "shopping-list-54e1c",
+            storageBucket: "shopping-list-54e1c.firebasestorage.app",
+            messagingSenderId: "613415694699",
+            appId: "1:613415694699:web:ca7bf0296f0487894adc2e"
+        };
+
+        // Firebaseの初期化
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         // グローバル変数
-        let db = null;
         let unsubscribe = null;
         let currentListId = null;
 
@@ -523,12 +454,6 @@
         const toast = document.getElementById('toast');
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
-        const firebaseSetup = document.getElementById('firebaseSetup');
-        const configModal = document.getElementById('configModal');
-        const configInput = document.getElementById('configInput');
-        const saveConfigButton = document.getElementById('saveConfigButton');
-        const cancelConfigButton = document.getElementById('cancelConfigButton');
-        const openConfigButton = document.getElementById('openConfigButton');
 
         // PWAインストール
         let deferredPrompt;
@@ -579,78 +504,6 @@
             return listId;
         }
 
-        // Firebase設定の取得・保存
-        function getFirebaseConfig() {
-            const saved = localStorage.getItem('firebaseConfig');
-            return saved ? JSON.parse(saved) : null;
-        }
-
-        function saveFirebaseConfig(config) {
-            localStorage.setItem('firebaseConfig', JSON.stringify(config));
-        }
-
-        // Firebase設定モーダル
-        openConfigButton.addEventListener('click', () => {
-            configModal.classList.add('active');
-        });
-
-        cancelConfigButton.addEventListener('click', () => {
-            configModal.classList.remove('active');
-        });
-
-        saveConfigButton.addEventListener('click', () => {
-            try {
-                const input = configInput.value.trim();
-                // firebaseConfigオブジェクトを抽出
-                const match = input.match(/\{[\s\S]*\}/);
-                if (!match) throw new Error('設定が見つかりません');
-                
-                const configStr = match[0];
-                const config = eval('(' + configStr + ')');
-                
-                // 必須フィールドの確認
-                if (!config.apiKey || !config.projectId) {
-                    throw new Error('apiKeyとprojectIdは必須です');
-                }
-
-                saveFirebaseConfig(config);
-                configModal.classList.remove('active');
-                showToast('設定を保存しました。ページを再読み込みしてください。');
-                setTimeout(() => location.reload(), 2000);
-            } catch (error) {
-                alert('設定の形式が正しくありません: ' + error.message);
-            }
-        });
-
-        // Firebaseの初期化
-        function initFirebase() {
-            const config = getFirebaseConfig();
-            
-            if (!config) {
-                firebaseSetup.style.display = 'block';
-                statusText.textContent = '設定が必要です';
-                statusIndicator.classList.add('offline');
-                return false;
-            }
-
-            try {
-                const app = initializeApp(config);
-                db = getFirestore(app);
-                firebaseSetup.style.display = 'none';
-                statusText.textContent = 'リアルタイム同期中';
-                statusIndicator.classList.remove('offline');
-                addButton.disabled = false;
-                return true;
-            } catch (error) {
-                console.error('Firebase初期化エラー:', error);
-                firebaseSetup.style.display = 'block';
-                statusText.textContent = '接続エラー';
-                statusIndicator.classList.add('offline');
-                showToast('Firebase接続エラー: ' + error.message);
-                return false;
-            }
-        }
-
         // HTML エスケープ
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -673,7 +526,7 @@
                 return;
             }
 
-            listSection.innerHTML = items.map((item, index) => `
+            listSection.innerHTML = items.map((item) => `
                 <div class="list-item ${item.checked ? 'checked' : ''}" data-id="${item.id}">
                     <input type="checkbox" class="checkbox" ${item.checked ? 'checked' : ''} 
                            onchange="window.toggleItem('${item.id}', ${!item.checked})">
@@ -685,8 +538,6 @@
 
         // アイテム追加
         async function addItem() {
-            if (!db) return;
-            
             const text = itemInput.value.trim();
             if (!text) return;
 
@@ -706,7 +557,6 @@
                 await setDoc(listRef, currentData);
                 
                 itemInput.value = '';
-                showToast('追加しました');
             } catch (error) {
                 console.error('追加エラー:', error);
                 showToast('追加に失敗しました');
@@ -715,8 +565,6 @@
 
         // アイテムのチェック切り替え
         window.toggleItem = async function(itemId, checked) {
-            if (!db) return;
-
             try {
                 const listRef = doc(db, 'shopping_lists', currentListId);
                 const listSnap = await getDoc(listRef);
@@ -735,8 +583,6 @@
 
         // アイテム削除
         window.deleteItem = async function(itemId) {
-            if (!db) return;
-
             try {
                 const listRef = doc(db, 'shopping_lists', currentListId);
                 const listSnap = await getDoc(listRef);
@@ -744,7 +590,6 @@
                 
                 currentData.items = currentData.items.filter(item => item.id !== itemId);
                 await setDoc(listRef, currentData);
-                showToast('削除しました');
             } catch (error) {
                 console.error('削除エラー:', error);
                 showToast('削除に失敗しました');
@@ -753,8 +598,6 @@
 
         // リアルタイムリスナー
         function setupRealtimeListener() {
-            if (!db) return;
-
             const listRef = doc(db, 'shopping_lists', currentListId);
             
             unsubscribe = onSnapshot(listRef, (doc) => {
@@ -764,6 +607,8 @@
                 } else {
                     renderList([]);
                 }
+                statusText.textContent = 'リアルタイム同期中';
+                statusIndicator.classList.remove('offline');
             }, (error) => {
                 console.error('リスナーエラー:', error);
                 statusText.textContent = '同期エラー';
@@ -773,8 +618,6 @@
 
         // 家族名の取得・保存
         async function loadFamilyName() {
-            if (!db) return null;
-
             try {
                 const nameRef = doc(db, 'family_names', currentListId);
                 const nameSnap = await getDoc(nameRef);
@@ -786,8 +629,6 @@
         }
 
         async function saveFamilyName(name) {
-            if (!db) return;
-
             try {
                 const nameRef = doc(db, 'family_names', currentListId);
                 await setDoc(nameRef, { name: name });
@@ -850,23 +691,26 @@
 
         // 初期化
         async function init() {
-            currentListId = getListId();
-            
-            if (!initFirebase()) {
-                return;
-            }
+            try {
+                currentListId = getListId();
+                setupRealtimeListener();
 
-            setupRealtimeListener();
-
-            const familyName = await loadFamilyName();
-            if (familyName) {
-                familyNameDisplay.textContent = `${familyName}の買い物リスト`;
-            } else {
-                const params = new URLSearchParams(window.location.search);
-                if (params.get('list') && !params.get('invited')) {
-                    // 新規作成時のみ名前入力を促す
-                    nameModal.classList.add('active');
+                const familyName = await loadFamilyName();
+                if (familyName) {
+                    familyNameDisplay.textContent = `${familyName}の買い物リスト`;
+                } else {
+                    const params = new URLSearchParams(window.location.search);
+                    // 新規リスト作成時のみ名前入力
+                    const urlListId = params.get('list');
+                    if (!urlListId || urlListId === currentListId) {
+                        nameModal.classList.add('active');
+                    }
                 }
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                statusText.textContent = '接続エラー';
+                statusIndicator.classList.add('offline');
+                showToast('Firebaseへの接続に失敗しました');
             }
         }
 

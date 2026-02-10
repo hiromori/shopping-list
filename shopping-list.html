@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#667eea">
     <meta name="description" content="家族で共有できる買い物リストアプリ">
     
-    <title>家族の買い物メモ（デバッグ版）</title>
+    <title>家族の買い物メモ</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="./manifest.json">
@@ -30,6 +30,8 @@
             min-height: 100vh;
             padding: 0;
             overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .container {
@@ -53,17 +55,6 @@
 
         .header h1 {
             font-size: 28px;
-            margin-bottom: 5px;
-        }
-
-        .debug-badge {
-            background: #ffc107;
-            color: #000;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            display: inline-block;
             margin-bottom: 10px;
         }
 
@@ -100,32 +91,6 @@
             animation: none;
         }
 
-        .debug-log {
-            background: #1e1e1e;
-            color: #00ff00;
-            padding: 15px;
-            margin: 10px 20px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 11px;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .debug-log .error {
-            color: #ff4444;
-        }
-
-        .debug-log .success {
-            color: #00ff00;
-        }
-
-        .debug-log .info {
-            color: #00bfff;
-        }
-
         .share-section {
             background: #f8f9fa;
             padding: 15px 20px;
@@ -146,6 +111,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .share-button:active {
@@ -157,6 +123,9 @@
             padding: 20px;
             border-bottom: 2px solid #f0f0f0;
             background: white;
+            position: sticky;
+            top: 140px;
+            z-index: 99;
         }
 
         .input-group {
@@ -170,6 +139,8 @@
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 16px;
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         #itemInput:focus {
@@ -186,11 +157,17 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #addButton:active {
             background: #5568d3;
             transform: scale(0.98);
+        }
+
+        #addButton:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
 
         .list-section {
@@ -206,6 +183,7 @@
             border-radius: 10px;
             margin-bottom: 10px;
             transition: all 0.3s;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .list-item.checked {
@@ -229,6 +207,8 @@
             flex: 1;
             font-size: 16px;
             color: #333;
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         .delete-button {
@@ -239,6 +219,7 @@
             border-radius: 6px;
             font-size: 14px;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .delete-button:active {
@@ -297,6 +278,8 @@
             border-radius: 8px;
             font-size: 16px;
             margin-bottom: 20px;
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         .modal-buttons {
@@ -312,6 +295,7 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .modal-button.primary {
@@ -341,12 +325,55 @@
         .toast.show {
             opacity: 1;
         }
+
+        .install-prompt {
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .install-prompt.show {
+            display: flex;
+        }
+
+        .install-prompt button {
+            padding: 8px 16px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .install-prompt button:active {
+            background: #f0f0f0;
+        }
+
+        .close-install {
+            background: transparent !important;
+            color: white !important;
+            font-size: 20px;
+            padding: 4px 8px !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="install-prompt" id="installPrompt">
+            <span>📱 アプリとしてインストールできます</span>
+            <div style="display: flex; gap: 8px;">
+                <button id="installButton">インストール</button>
+                <button class="close-install" id="closeInstall">×</button>
+            </div>
+        </div>
+
         <div class="header">
-            <div class="debug-badge">🔍 デバッグモード</div>
             <h1>🛒 買い物メモ</h1>
             <div class="family-name" id="familyName">家族の買い物リスト</div>
             <div class="status-bar">
@@ -354,9 +381,6 @@
                 <span id="statusText">接続中...</span>
             </div>
         </div>
-
-        <div class="debug-log" id="debugLog">デバッグログ:
-</div>
 
         <div class="share-section">
             <button class="share-button" id="shareButton">
@@ -400,16 +424,6 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // デバッグログ
-        const debugLog = document.getElementById('debugLog');
-        function log(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
-            debugLog.innerHTML += `\n[${timestamp}] <span class="${className}">${message}</span>`;
-            debugLog.scrollTop = debugLog.scrollHeight;
-            console.log(`[${type}] ${message}`);
-        }
-
         // Firebase設定
         const firebaseConfig = {
             apiKey: "AIzaSyAe1O5irhlh_AdsTXbio-PfGXffz7N6aow",
@@ -420,18 +434,9 @@
             appId: "1:613415694699:web:ca7bf0296f0487894adc2e"
         };
 
-        log('Firebase設定を読み込みました');
-
         // Firebaseの初期化
-        let app, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            log('✓ Firebaseアプリを初期化しました', 'success');
-            db = getFirestore(app);
-            log('✓ Firestoreに接続しました', 'success');
-        } catch (error) {
-            log('✗ Firebase初期化エラー: ' + error.message, 'error');
-        }
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         // グローバル変数
         let unsubscribe = null;
@@ -450,6 +455,36 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
 
+        // PWAインストール
+        let deferredPrompt;
+        const installPrompt = document.getElementById('installPrompt');
+        const installButton = document.getElementById('installButton');
+        const closeInstall = document.getElementById('closeInstall');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installPrompt.classList.add('show');
+        });
+
+        installButton.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                installPrompt.classList.remove('show');
+            }
+        });
+
+        closeInstall.addEventListener('click', () => {
+            installPrompt.classList.remove('show');
+        });
+
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js').catch(err => console.log('SW error:', err));
+        }
+
         // トースト表示
         function showToast(message) {
             toast.textContent = message;
@@ -461,14 +496,24 @@
         function getListId() {
             const params = new URLSearchParams(window.location.search);
             let listId = params.get('list');
+            
             if (!listId) {
-                listId = Math.random().toString(36).substring(2, 15);
+                // URLにリストIDがない場合、localStorageから取得
+                listId = localStorage.getItem('defaultListId');
+                
+                if (!listId) {
+                    // localStorageにもない場合、新規作成
+                    listId = Math.random().toString(36).substring(2, 15);
+                    localStorage.setItem('defaultListId', listId);
+                }
+                
                 const newUrl = `${window.location.pathname}?list=${listId}`;
                 window.history.replaceState({}, '', newUrl);
-                log('新しいリストIDを生成: ' + listId);
             } else {
-                log('既存のリストIDを使用: ' + listId);
+                // URLにリストIDがある場合、それをデフォルトとして保存
+                localStorage.setItem('defaultListId', listId);
             }
+            
             return listId;
         }
 
@@ -481,8 +526,6 @@
 
         // リスト描画
         function renderList(items) {
-            log(`リストを描画: ${items ? items.length : 0}件のアイテム`);
-            
             if (!items || items.length === 0) {
                 listSection.innerHTML = `
                     <div class="empty-state">
@@ -509,22 +552,12 @@
         // アイテム追加
         async function addItem() {
             const text = itemInput.value.trim();
-            if (!text) {
-                log('空のテキストは追加できません', 'error');
-                return;
-            }
-
-            log(`アイテムを追加中: "${text}"`);
+            if (!text) return;
 
             try {
                 const listRef = doc(db, 'shopping_lists', currentListId);
-                log(`Firestoreパス: shopping_lists/${currentListId}`);
-                
                 const listSnap = await getDoc(listRef);
-                log('既存データを取得しました');
-                
                 const currentData = listSnap.exists() ? listSnap.data() : { items: [] };
-                log(`現在のアイテム数: ${currentData.items ? currentData.items.length : 0}`);
                 
                 const newItem = {
                     id: Date.now().toString(),
@@ -534,23 +567,17 @@
                 };
 
                 currentData.items.push(newItem);
-                log(`新しいアイテムを追加。合計: ${currentData.items.length}件`);
-                
                 await setDoc(listRef, currentData);
-                log('✓ Firestoreに保存しました', 'success');
                 
                 itemInput.value = '';
-                showToast('追加しました');
             } catch (error) {
-                log('✗ 追加エラー: ' + error.code + ' - ' + error.message, 'error');
-                showToast('追加に失敗しました: ' + error.code);
+                console.error('追加エラー:', error);
+                showToast('追加に失敗しました');
             }
         }
 
         // アイテムのチェック切り替え
         window.toggleItem = async function(itemId, checked) {
-            log(`チェック切り替え: ID=${itemId}, checked=${checked}`);
-            
             try {
                 const listRef = doc(db, 'shopping_lists', currentListId);
                 const listSnap = await getDoc(listRef);
@@ -560,18 +587,15 @@
                 if (itemIndex !== -1) {
                     currentData.items[itemIndex].checked = checked;
                     await setDoc(listRef, currentData);
-                    log('✓ チェック状態を更新しました', 'success');
                 }
             } catch (error) {
-                log('✗ 更新エラー: ' + error.code + ' - ' + error.message, 'error');
+                console.error('更新エラー:', error);
                 showToast('更新に失敗しました');
             }
         };
 
         // アイテム削除
         window.deleteItem = async function(itemId) {
-            log(`アイテムを削除中: ID=${itemId}`);
-            
             try {
                 const listRef = doc(db, 'shopping_lists', currentListId);
                 const listSnap = await getDoc(listRef);
@@ -579,39 +603,30 @@
                 
                 currentData.items = currentData.items.filter(item => item.id !== itemId);
                 await setDoc(listRef, currentData);
-                log('✓ アイテムを削除しました', 'success');
             } catch (error) {
-                log('✗ 削除エラー: ' + error.code + ' - ' + error.message, 'error');
+                console.error('削除エラー:', error);
                 showToast('削除に失敗しました');
             }
         };
 
         // リアルタイムリスナー
         function setupRealtimeListener() {
-            log('リアルタイムリスナーを設定中...');
             const listRef = doc(db, 'shopping_lists', currentListId);
             
-            unsubscribe = onSnapshot(listRef, 
-                (doc) => {
-                    log('データ更新を受信しました');
-                    if (doc.exists()) {
-                        const data = doc.data();
-                        log(`取得したアイテム数: ${data.items ? data.items.length : 0}`);
-                        renderList(data.items || []);
-                    } else {
-                        log('ドキュメントが存在しません（初回）');
-                        renderList([]);
-                    }
-                    statusText.textContent = 'リアルタイム同期中';
-                    statusIndicator.classList.remove('offline');
-                }, 
-                (error) => {
-                    log('✗ リスナーエラー: ' + error.code + ' - ' + error.message, 'error');
-                    statusText.textContent = '同期エラー';
-                    statusIndicator.classList.add('offline');
+            unsubscribe = onSnapshot(listRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    renderList(data.items || []);
+                } else {
+                    renderList([]);
                 }
-            );
-            log('✓ リアルタイムリスナーを設定しました', 'success');
+                statusText.textContent = 'リアルタイム同期中';
+                statusIndicator.classList.remove('offline');
+            }, (error) => {
+                console.error('リスナーエラー:', error);
+                statusText.textContent = '同期エラー';
+                statusIndicator.classList.add('offline');
+            });
         }
 
         // 家族名の取得・保存
@@ -621,7 +636,7 @@
                 const nameSnap = await getDoc(nameRef);
                 return nameSnap.exists() ? nameSnap.data().name : null;
             } catch (error) {
-                log('家族名読み込みエラー: ' + error.message, 'error');
+                console.error('家族名読み込みエラー:', error);
                 return null;
             }
         }
@@ -630,9 +645,8 @@
             try {
                 const nameRef = doc(db, 'family_names', currentListId);
                 await setDoc(nameRef, { name: name });
-                log('✓ 家族名を保存しました: ' + name, 'success');
             } catch (error) {
-                log('✗ 家族名保存エラー: ' + error.message, 'error');
+                console.error('家族名保存エラー:', error);
             }
         }
 
@@ -649,13 +663,33 @@
         // 共有機能
         shareButton.addEventListener('click', async () => {
             const inviteLink = `${window.location.origin}${window.location.pathname}?list=${currentListId}`;
-            log('招待リンクをコピー: ' + inviteLink);
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: '家族の買い物メモ',
+                        text: '買い物リストを共有します',
+                        url: inviteLink
+                    });
+                    return;
+                } catch (error) {
+                    if (error.name === 'AbortError') return;
+                }
+            }
             
             try {
                 await navigator.clipboard.writeText(inviteLink);
-                showToast('リンクをコピーしました！');
+                showToast('リンクをコピーしました！LINEで共有してください');
             } catch (error) {
-                log('クリップボードエラー: ' + error.message, 'error');
+                const textarea = document.createElement('textarea');
+                textarea.value = inviteLink;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('リンクをコピーしました！LINEで共有してください');
             }
         });
 
@@ -670,8 +704,6 @@
 
         // 初期化
         async function init() {
-            log('アプリを初期化中...');
-            
             try {
                 currentListId = getListId();
                 setupRealtimeListener();
@@ -679,21 +711,19 @@
                 const familyName = await loadFamilyName();
                 if (familyName) {
                     familyNameDisplay.textContent = `${familyName}の買い物リスト`;
-                    log('家族名を読み込みました: ' + familyName);
                 } else {
                     const params = new URLSearchParams(window.location.search);
+                    // 新規リスト作成時のみ名前入力
                     const urlListId = params.get('list');
                     if (!urlListId || urlListId === currentListId) {
                         nameModal.classList.add('active');
-                        log('家族名入力モーダルを表示');
                     }
                 }
-                
-                log('✓ 初期化完了', 'success');
             } catch (error) {
-                log('✗ 初期化エラー: ' + error.message, 'error');
+                console.error('初期化エラー:', error);
                 statusText.textContent = '接続エラー';
                 statusIndicator.classList.add('offline');
+                showToast('Firebaseへの接続に失敗しました');
             }
         }
 

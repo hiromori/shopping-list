@@ -497,22 +497,25 @@
             const params = new URLSearchParams(window.location.search);
             let listId = params.get('list');
             
-            if (!listId) {
-                // URLにリストIDがない場合、localStorageから取得
-                listId = localStorage.getItem('defaultListId');
-                
-                if (!listId) {
-                    // localStorageにもない場合、新規作成
-                    listId = Math.random().toString(36).substring(2, 15);
-                    localStorage.setItem('defaultListId', listId);
-                }
-                
-                const newUrl = `${window.location.pathname}?list=${listId}`;
-                window.history.replaceState({}, '', newUrl);
-            } else {
-                // URLにリストIDがある場合、それをデフォルトとして保存
-                localStorage.setItem('defaultListId', listId);
+            if (listId) {
+                // URLにリストIDがある場合（招待リンクから開いた場合）
+                // このリストIDを今後のデフォルトとして保存
+                localStorage.setItem('currentListId', listId);
+                return listId;
             }
+            
+            // URLにリストIDがない場合、前回使っていたリストIDを復元
+            listId = localStorage.getItem('currentListId');
+            
+            if (!listId) {
+                // 初回アクセスの場合、新しいリストIDを作成
+                listId = Math.random().toString(36).substring(2, 15);
+                localStorage.setItem('currentListId', listId);
+            }
+            
+            // URLにリストIDを追加
+            const newUrl = `${window.location.pathname}?list=${listId}`;
+            window.history.replaceState({}, '', newUrl);
             
             return listId;
         }

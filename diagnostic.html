@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>診断 - 買い物メモ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            background: #667eea;
+            color: white;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .code-block {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 買い物メモアプリ診断</h1>
+        
+        <div class="test-section">
+            <h3>テスト1: HTMLファイルの確認</h3>
+            <button onclick="checkHTML()">HTMLをチェック</button>
+            <div id="htmlResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>テスト2: 必須要素の確認</h3>
+            <button onclick="checkElements()">要素をチェック</button>
+            <div id="elementsResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>テスト3: JavaScriptの確認</h3>
+            <button onclick="checkJavaScript()">JSをチェック</button>
+            <div id="jsResult"></div>
+        </div>
+
+        <div class="instructions">
+            <h4>📋 この診断ページの使い方</h4>
+            <ol>
+                <li>上記の各テストボタンをクリック</li>
+                <li>エラーが表示されたら、その指示に従ってください</li>
+                <li>全てのテストが✅になったら、アプリが正常に動作します</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🛠️ 修正方法</h3>
+            <div id="fixInstructions"></div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="window.location.href='./shopping-list.html'">
+                📱 アプリを開く
+            </button>
+            <button onclick="window.location.href='./reset.html'" style="background: #dc3545;">
+                🔄 リセットページ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        async function checkHTML() {
+            const resultDiv = document.getElementById('htmlResult');
+            resultDiv.innerHTML = '<p>チェック中...</p>';
+
+            try {
+                const response = await fetch('./shopping-list.html');
+                const html = await response.text();
+
+                let results = '';
+
+                // ⚙️ボタンの確認
+                if (html.includes('manageListsButton') && html.includes('⚙️')) {
+                    results += '<div class="status success">✅ ⚙️ボタンが存在します</div>';
+                } else {
+                    results += '<div class="status error">❌ ⚙️ボタンが見つかりません</div>';
+                }
+
+                // リスト管理モーダルの確認
+                if (html.includes('manageModal') && html.includes('新しいリストを作成')) {
+                    results += '<div class="status success">✅ リスト管理モーダルが存在します</div>';
+                } else {
+                    results += '<div class="status error">❌ リスト管理モーダルが見つかりません</div>';
+                }
+
+                // createNewListButton の確認
+                if (html.includes('createNewListButton')) {
+                    results += '<div class="status success">✅ 新規作成ボタンが存在します</div>';
+                } else {
+                    results += '<div class="status error">❌ 新規作成ボタンが見つかりません</div>';
+                }
+
+                // ファイルサイズ確認
+                const sizeKB = (html.length / 1024).toFixed(2);
+                if (html.length > 10000) {
+                    results += `<div class="status success">✅ ファイルサイズ: ${sizeKB}KB（正常）</div>`;
+                } else {
+                    results += `<div class="status warning">⚠️ ファイルサイズ: ${sizeKB}KB（小さすぎる可能性）</div>`;
+                }
+
+                resultDiv.innerHTML = results;
+
+                // エラーがある場合の修正方法を表示
+                if (results.includes('❌')) {
+                    showFixInstructions();
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status error">❌ エラー: ${error.message}</div>`;
+            }
+        }
+
+        function checkElements() {
+            const resultDiv = document.getElementById('elementsResult');
+            let results = '';
+
+            const elements = {
+                'manageListsButton': '⚙️ボタン',
+                'manageModal': 'リスト管理モーダル',
+                'createNewListButton': '新規作成ボタン',
+                'listSelector': 'リスト選択ドロップダウン',
+                'savedLists': '保存済みリスト表示エリア'
+            };
+
+            // 実際にアプリページの要素を確認
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = './shopping-list.html';
+            document.body.appendChild(iframe);
+
+            iframe.onload = function() {
+                for (const [id, name] of Object.entries(elements)) {
+                    const element = iframe.contentDocument.getElementById(id);
+                    if (element) {
+                        results += `<div class="status success">✅ ${name} が存在します</div>`;
+                    } else {
+                        results += `<div class="status error">❌ ${name} が見つかりません (id="${id}")</div>`;
+                    }
+                }
+                resultDiv.innerHTML = results;
+                document.body.removeChild(iframe);
+
+                if (results.includes('❌')) {
+                    showFixInstructions();
+                }
+            };
+        }
+
+        function checkJavaScript() {
+            const resultDiv = document.getElementById('jsResult');
+            
+            fetch('./shopping-list.html')
+                .then(response => response.text())
+                .then(html => {
+                    let results = '';
+
+                    // 重要な関数の存在確認
+                    const functions = [
+                        'createNewList',
+                        'switchList',
+                        'displaySavedLists',
+                        'updateListSelector',
+                        'addToSavedLists'
+                    ];
+
+                    functions.forEach(func => {
+                        if (html.includes(func)) {
+                            results += `<div class="status success">✅ 関数 ${func}() が存在します</div>`;
+                        } else {
+                            results += `<div class="status error">❌ 関数 ${func}() が見つかりません</div>`;
+                        }
+                    });
+
+                    resultDiv.innerHTML = results;
+
+                    if (results.includes('❌')) {
+                        showFixInstructions();
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<div class="status error">❌ エラー: ${error.message}</div>`;
+                });
+        }
+
+        function showFixInstructions() {
+            const fixDiv = document.getElementById('fixInstructions');
+            fixDiv.innerHTML = `
+                <div class="status error">
+                    <strong>❌ ファイルが正しくアップロードされていません</strong>
+                </div>
+                
+                <h4>修正手順：</h4>
+                <ol>
+                    <li><strong>shopping-list-complete.html をダウンロード</strong>（既にダウンロード済みのはず）</li>
+                    <li><strong>ファイル名を shopping-list.html に変更</strong></li>
+                    <li><strong>GitHubで既存の shopping-list.html を削除</strong></li>
+                    <li><strong>新しい shopping-list.html をアップロード</strong></li>
+                    <li><strong>ブラウザで強制リロード</strong>
+                        <ul>
+                            <li>Windows: Ctrl + Shift + R</li>
+                            <li>Mac: Command + Shift + R</li>
+                        </ul>
+                    </li>
+                </ol>
+
+                <h4>それでも解決しない場合：</h4>
+                <div class="code-block">
+                    1. ブラウザの開発者ツールを開く（F12キー）<br>
+                    2. Consoleタブを確認<br>
+                    3. エラーメッセージがあれば教えてください
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

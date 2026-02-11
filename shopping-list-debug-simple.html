@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>買い物メモ（デバッグ版）</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .debug { background: #ffe; border: 2px solid #fa0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .debug h3 { margin: 0 0 10px 0; color: #c60; }
+        .debug pre { background: #fff; padding: 10px; overflow-x: auto; font-size: 12px; }
+        button { padding: 10px 20px; margin: 5px; font-size: 14px; cursor: pointer; }
+        input, select { padding: 8px; margin: 5px; font-size: 14px; }
+        .section { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🛒 買い物メモ（デバッグ版）</h1>
+    
+    <div class="debug">
+        <h3>現在の状態</h3>
+        <pre id="status">読み込み中...</pre>
+    </div>
+
+    <div class="section">
+        <h3>1. 保存済みリスト</h3>
+        <div id="savedListsInfo"></div>
+    </div>
+
+    <div class="section">
+        <h3>2. リスト選択</h3>
+        <select id="listSelector" style="width: 300px;">
+            <option value="">選択してください...</option>
+        </select>
+        <button onclick="selectList()">このリストに切り替え</button>
+    </div>
+
+    <div class="section">
+        <h3>3. 新しいリスト作成</h3>
+        <input type="text" id="newListName" placeholder="リスト名（例：家族）" style="width: 200px;">
+        <button onclick="createList()">作成</button>
+    </div>
+
+    <div class="section">
+        <h3>4. アイテム追加テスト</h3>
+        <input type="text" id="itemInput" placeholder="テストアイテム" style="width: 200px;">
+        <button onclick="addTestItem()">追加</button>
+        <div id="itemsList" style="margin-top: 10px;"></div>
+    </div>
+
+    <div class="section">
+        <h3>5. LocalStorageリセット</h3>
+        <button onclick="resetStorage()" style="background: #dc3545; color: white;">全てリセット</button>
+        <small>（問題が解決しない場合のみ使用）</small>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAe1O5irhlh_AdsTXbio-PfGXffz7N6aow",
+            authDomain: "shopping-list-54e1c.firebaseapp.com",
+            projectId: "shopping-list-54e1c",
+            storageBucket: "shopping-list-54e1c.firebasestorage.app",
+            messagingSenderId: "613415694699",
+            appId: "1:613415694699:web:ca7bf0296f0487894adc2e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        let currentListId = null;
+        let savedLists = {};
+        let unsubscribe = null;
+
+        function updateStatus() {
+            const status = document.getElementById('status');
+            const params = new URLSearchParams(window.location.search);
+            status.textContent = `
+現在のリストID: ${currentListId || '未設定'}
+URLパラメータ: ${params.get('list') || 'なし'}
+LocalStorage lastUsedListId: ${localStorage.getItem('lastUsedListId') || 'なし'}
+保存済みリスト数: ${Object.keys(savedLists).length}
+
+保存済みリスト詳細:
+${JSON.stringify(savedLists, null, 2)}
+            `;
+        }
+
+        function loadSavedLists() {
+            const saved = localStorage.getItem('savedLists');
+            savedLists = saved ? JSON.parse(saved) : {};
+            updateSavedListsDisplay();
+            updateListSelector();
+            updateStatus();
+        }
+
+        function saveSavedLists() {
+            localStorage.setItem('savedLists', JSON.stringify(savedLists));
+            updateStatus();
+        }
+
+        function updateSavedListsDisplay() {
+            const container = document.getElementById('savedListsInfo');
+            if (Object.keys(savedLists).length === 0) {
+                container.innerHTML = '<p style="color: #999;">保存済みリストがありません</p>';
+                return;
+            }
+            
+            let html = '<ul>';
+            for (const [listId, data] of Object.entries(savedLists)) {
+                const isCurrent = listId === currentListId ? ' ★現在使用中★' : '';
+                html += `<li><strong>${data.name}</strong> (ID: ${listId})${isCurrent}</li>`;
+            }
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        function updateListSelector() {
+            const selector = document.getElementById('listSelector');
+            selector.innerHTML = '<option value="">選択してください...</option>';
+            
+            for (const [listId, data] of Object.entries(savedLists)) {
+                const option = document.createElement('option');
+                option.value = listId;
+                option.textContent = `${data.name} (${listId})`;
+                if (listId === currentListId) {
+                    option.selected = true;
+                }
+                selector.appendChild(option);
+            }
+        }
+
+        async function switchToList(listId) {
+            console.log('切り替え開始:', listId);
+            
+            if (unsubscribe) {
+                unsubscribe();
+            }
+
+            currentListId = listId;
+            localStorage.setItem('lastUsedListId', listId);
+            
+            if (savedLists[listId]) {
+                savedLists[listId].lastUsed = Date.now();
+                saveSavedLists();
+            }
+
+            const newUrl = `${window.location.pathname}?list=${listId}`;
+            window.history.replaceState({}, '', newUrl);
+
+            updateSavedListsDisplay();
+            updateListSelector();
+            updateStatus();
+            
+            console.log('リアルタイムリスナー設定中...');
+            setupRealtimeListener();
+            
+            await loadItems();
+        }
+
+        function setupRealtimeListener() {
+            const listRef = doc(db, 'shopping_lists', currentListId);
+            
+            unsubscribe = onSnapshot(listRef, 
+                (doc) => {
+                    console.log('データ更新:', doc.exists());
+                    if (doc.exists()) {
+                        const data = doc.data();
+                        displayItems(data.items || []);
+                    } else {
+                        displayItems([]);
+                    }
+                },
+                (error) => {
+                    console.error('リスナーエラー:', error);
+                    alert('同期エラー: ' + error.message);
+                }
+            );
+        }
+
+        async function loadItems() {
+            try {
+                const listRef = doc(db, 'shopping_lists', currentListId);
+                const listSnap = await getDoc(listRef);
+                
+                if (listSnap.exists()) {
+                    const data = listSnap.data();
+                    displayItems(data.items || []);
+                    console.log('アイテム読み込み成功:', data.items?.length || 0);
+                } else {
+                    displayItems([]);
+                    console.log('新しいリスト（データなし）');
+                }
+            } catch (error) {
+                console.error('読み込みエラー:', error);
+                alert('読み込みエラー: ' + error.message);
+            }
+        }
+
+        function displayItems(items) {
+            const container = document.getElementById('itemsList');
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p style="color: #999;">アイテムがありません</p>';
+                return;
+            }
+            
+            let html = '<ul>';
+            items.forEach(item => {
+                html += `<li>${item.text} ${item.checked ? '✓' : ''}</li>`;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        window.selectList = function() {
+            const selector = document.getElementById('listSelector');
+            const listId = selector.value;
+            
+            if (!listId) {
+                alert('リストを選択してください');
+                return;
+            }
+            
+            console.log('選択されたリスト:', listId);
+            switchToList(listId);
+        };
+
+        window.createList = async function() {
+            const nameInput = document.getElementById('newListName');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('リスト名を入力してください');
+                return;
+            }
+            
+            const newListId = Math.random().toString(36).substring(2, 15);
+            console.log('新しいリスト作成:', newListId, name);
+            
+            savedLists[newListId] = {
+                name: name,
+                lastUsed: Date.now()
+            };
+            saveSavedLists();
+            
+            try {
+                const nameRef = doc(db, 'family_names', newListId);
+                await setDoc(nameRef, { name: name });
+                console.log('Firestoreに名前を保存しました');
+            } catch (error) {
+                console.error('名前保存エラー:', error);
+            }
+            
+            nameInput.value = '';
+            await switchToList(newListId);
+            alert(`リスト「${name}」を作成しました！`);
+        };
+
+        window.addTestItem = async function() {
+            if (!currentListId) {
+                alert('先にリストを選択してください');
+                return;
+            }
+            
+            const input = document.getElementById('itemInput');
+            const text = input.value.trim();
+            
+            if (!text) {
+                alert('アイテム名を入力してください');
+                return;
+            }
+            
+            try {
+                const listRef = doc(db, 'shopping_lists', currentListId);
+                const listSnap = await getDoc(listRef);
+                const currentData = listSnap.exists() ? listSnap.data() : { items: [] };
+                
+                const newItem = {
+                    id: Date.now().toString(),
+                    text: text,
+                    checked: false,
+                    timestamp: Date.now()
+                };
+                
+                currentData.items.push(newItem);
+                await setDoc(listRef, currentData);
+                
+                input.value = '';
+                console.log('アイテム追加成功:', text);
+                alert('追加しました！');
+            } catch (error) {
+                console.error('追加エラー:', error);
+                alert('追加エラー: ' + error.message);
+            }
+        };
+
+        window.resetStorage = function() {
+            if (confirm('本当に全てリセットしますか？\n（Firebaseのデータは削除されません）')) {
+                localStorage.clear();
+                alert('リセットしました。ページをリロードします。');
+                location.reload();
+            }
+        };
+
+        // 初期化
+        async function init() {
+            console.log('初期化開始');
+            loadSavedLists();
+            
+            const params = new URLSearchParams(window.location.search);
+            let listId = params.get('list');
+            
+            if (!listId) {
+                listId = localStorage.getItem('lastUsedListId');
+            }
+            
+            if (listId && savedLists[listId]) {
+                console.log('既存リストに接続:', listId);
+                await switchToList(listId);
+            } else if (Object.keys(savedLists).length > 0) {
+                const firstListId = Object.keys(savedLists)[0];
+                console.log('最初のリストに接続:', firstListId);
+                await switchToList(firstListId);
+            } else {
+                console.log('リストなし。新規作成してください。');
+                updateStatus();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
